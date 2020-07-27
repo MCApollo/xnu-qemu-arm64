@@ -25,7 +25,6 @@ static int qemu_backup_dump_get_info(BlockDriverState *bs, BlockDriverInfo *bdi)
     BDRVBackupDumpState *s = bs->opaque;
 
     bdi->cluster_size = s->dump_cb_block_size;
-    bdi->unallocated_blocks_are_zero = true;
     return 0;
 }
 
@@ -106,7 +105,7 @@ static coroutine_fn int qemu_backup_dump_co_writev(
 static void qemu_backup_dump_child_perm(
     BlockDriverState *bs,
     BdrvChild *c,
-    const BdrvChildRole *role,
+    BdrvChildRole role,
     BlockReopenQueue *reopen_queue,
     uint64_t perm, uint64_t shared,
     uint64_t *nperm, uint64_t *nshared)

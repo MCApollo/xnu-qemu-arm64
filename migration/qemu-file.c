@@ -118,7 +118,7 @@ QEMUFile *qemu_fopen_ops_sized(void *opaque, const QEMUFileOps *ops, size_t buff
 
 QEMUFile *qemu_fopen_ops(void *opaque, const QEMUFileOps *ops)
 {
-    return qemu_fopen_ops_sized(opaque, ops, DEFAULT_IO_BUF_SIZE);
+    return qemu_fopen_ops_sized(opaque, ops, IO_BUF_SIZE);
 }
 
 

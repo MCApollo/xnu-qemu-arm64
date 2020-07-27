@@ -12,7 +12,6 @@ block-obj-$(CONFIG_QED) += qed.o qed-l2-cache.o qed-table.o qed-cluster.o
 block-obj-$(CONFIG_QED) += qed-check.o
 block-obj-y += vhdx.o vhdx-endian.o vhdx-log.o
 block-obj-y += quorum.o
-block-obj-y += zeroinit.o
 block-obj-y += blkdebug.o blkverify.o blkreplay.o
 block-obj-$(CONFIG_PARALLELS) += parallels.o
 block-obj-y += blklogwrites.o

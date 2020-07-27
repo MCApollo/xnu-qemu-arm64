@@ -111,7 +111,7 @@ static int save_snapshot_cleanup(void)
          * note2: PVE requires 1024 (BDRV_SECTOR_SIZE*2) alignment
          */
         size_t size = QEMU_ALIGN_UP(snap_state.bs_pos, BDRV_SECTOR_SIZE*2);
-        blk_truncate(snap_state.target, size, false, PREALLOC_MODE_OFF, NULL);
+        blk_truncate(snap_state.target, size, false, PREALLOC_MODE_OFF, 0, NULL);
         blk_op_unblock_all(snap_state.target, snap_state.blocker);
         error_free(snap_state.blocker);
         snap_state.blocker = NULL;

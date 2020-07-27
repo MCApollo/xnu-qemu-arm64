@@ -3036,6 +3036,7 @@
 { 'struct': 'BlockdevOptionsNull',
   'data': { '*size': 'int', '*latency-ns': 'uint64', '*read-zeroes': 'bool' } }
 
+##
 # @BlockdevOptionsPbs:
 #
 # Driver specific block device options for the PBS backend.

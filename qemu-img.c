@@ -4906,7 +4906,7 @@ static int img_dd_osize(const char *arg,
                         struct DdIo *in, struct DdIo *out,
                         struct DdInfo *dd)
 {
-    dd->osize = cvtnum(arg);
+    dd->osize = cvtnum("osize", arg);
 
     if (dd->osize < 0) {
         error_report("invalid number: '%s'", arg);
@@ -4920,7 +4920,7 @@ static int img_dd_isize(const char *arg,
                         struct DdIo *in, struct DdIo *out,
                         struct DdInfo *dd)
 {
-    dd->isize = cvtnum(arg);
+    dd->isize = cvtnum("isize", arg);
 
     if (dd->isize < 0) {
         error_report("invalid number: '%s'", arg);
