@@ -539,6 +539,11 @@ SpiceInfo *qmp_query_spice(Error **errp)
     micro = SPICE_SERVER_VERSION & 0xff;
     info->compiled_version = g_strdup_printf("%d.%d.%d", major, minor, micro);
 
+    if (auth_passwd) {
+        info->has_ticket = true;
+        info->ticket =  g_strdup(auth_passwd);
+    }
+
     if (port) {
         info->has_port = true;
         info->port = port;
@@ -668,32 +673,35 @@ void qemu_spice_init(void)
 
     if (tls_port) {
         x509_dir = qemu_opt_get(opts, "x509-dir");
-        if (!x509_dir) {
-            x509_dir = ".";
-        }
 
         str = qemu_opt_get(opts, "x509-key-file");
         if (str) {
             x509_key_file = g_strdup(str);
-        } else {
+        } else if (x509_dir) {
             x509_key_file = g_strdup_printf("%s/%s", x509_dir,
                                             X509_SERVER_KEY_FILE);
+        } else {
+            x509_key_file = g_strdup("/etc/pve/local/pve-ssl.key");
         }
 
         str = qemu_opt_get(opts, "x509-cert-file");
         if (str) {
             x509_cert_file = g_strdup(str);
-        } else {
+        } else if (x509_dir) {
             x509_cert_file = g_strdup_printf("%s/%s", x509_dir,
                                              X509_SERVER_CERT_FILE);
+        } else {
+            x509_cert_file = g_strdup("/etc/pve/local/pve-ssl.pem");
         }
 
         str = qemu_opt_get(opts, "x509-cacert-file");
         if (str) {
             x509_cacert_file = g_strdup(str);
-        } else {
+        } else if (x509_dir) {
             x509_cacert_file = g_strdup_printf("%s/%s", x509_dir,
                                                X509_CA_CERT_FILE);
+        } else {
+            x509_cacert_file = g_strdup("/etc/pve/pve-root-ca.pem");
         }
 
         x509_key_password = qemu_opt_get(opts, "x509-key-password");

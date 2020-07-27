@@ -65,15 +65,9 @@ static void nrf51_soc_realize(DeviceState *dev_soc, Error **errp)
         return;
     }
 
-    object_property_set_link(OBJECT(&s->cpu), OBJECT(&s->container), "memory",
-            &err);
-    if (err) {
-        error_propagate(errp, err);
-        return;
-    }
-    object_property_set_bool(OBJECT(&s->cpu), true, "realized", &err);
-    if (err) {
-        error_propagate(errp, err);
+    object_property_set_link(OBJECT(&s->cpu), "memory", OBJECT(&s->container),
+                             &error_abort);
+    if (!sysbus_realize(SYS_BUS_DEVICE(&s->cpu), errp)) {
         return;
     }
 
@@ -88,9 +82,7 @@ static void nrf51_soc_realize(DeviceState *dev_soc, Error **errp)
     memory_region_add_subregion(&s->container, NRF51_SRAM_BASE, &s->sram);
 
     /* UART */
-    object_property_set_bool(OBJECT(&s->uart), true, "realized", &err);
-    if (err) {
-        error_propagate(errp, err);
+    if (!sysbus_realize(SYS_BUS_DEVICE(&s->uart), errp)) {
         return;
     }
     mr = sysbus_mmio_get_region(SYS_BUS_DEVICE(&s->uart), 0);
@@ -100,9 +92,7 @@ static void nrf51_soc_realize(DeviceState *dev_soc, Error **errp)
                        BASE_TO_IRQ(NRF51_UART_BASE)));
 
     /* RNG */
-    object_property_set_bool(OBJECT(&s->rng), true, "realized", &err);
-    if (err) {
-        error_propagate(errp, err);
+    if (!sysbus_realize(SYS_BUS_DEVICE(&s->rng), errp)) {
         return;
     }
 
@@ -113,16 +103,12 @@ static void nrf51_soc_realize(DeviceState *dev_soc, Error **errp)
                        BASE_TO_IRQ(NRF51_RNG_BASE)));
 
     /* UICR, FICR, NVMC, FLASH */
-    object_property_set_uint(OBJECT(&s->nvm), s->flash_size, "flash-size",
-                             &err);
-    if (err) {
-        error_propagate(errp, err);
+    if (!object_property_set_uint(OBJECT(&s->nvm), "flash-size",
+                                  s->flash_size, errp)) {
         return;
     }
 
-    object_property_set_bool(OBJECT(&s->nvm), true, "realized", &err);
-    if (err) {
-        error_propagate(errp, err);
+    if (!sysbus_realize(SYS_BUS_DEVICE(&s->nvm), errp)) {
         return;
     }
 
@@ -136,9 +122,7 @@ static void nrf51_soc_realize(DeviceState *dev_soc, Error **errp)
     memory_region_add_subregion_overlap(&s->container, NRF51_FLASH_BASE, mr, 0);
 
     /* GPIO */
-    object_property_set_bool(OBJECT(&s->gpio), true, "realized", &err);
-    if (err) {
-        error_propagate(errp, err);
+    if (!sysbus_realize(SYS_BUS_DEVICE(&s->gpio), errp)) {
         return;
     }
 
@@ -150,13 +134,14 @@ static void nrf51_soc_realize(DeviceState *dev_soc, Error **errp)
 
     /* TIMER */
     for (i = 0; i < NRF51_NUM_TIMERS; i++) {
-        object_property_set_bool(OBJECT(&s->timer[i]), true, "realized", &err);
-        if (err) {
-            error_propagate(errp, err);
+        if (!object_property_set_uint(OBJECT(&s->timer[i]), "id", i, errp)) {
+            return;
+        }
+        if (!sysbus_realize(SYS_BUS_DEVICE(&s->timer[i]), errp)) {
             return;
         }
 
-        base_addr = NRF51_TIMER_BASE + i * NRF51_TIMER_SIZE;
+        base_addr = NRF51_TIMER_BASE + i * NRF51_PERIPHERAL_SIZE;
 
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->timer[i]), 0, base_addr);
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->timer[i]), 0,
@@ -165,8 +150,8 @@ static void nrf51_soc_realize(DeviceState *dev_soc, Error **errp)
     }
 
     /* STUB Peripherals */
-    memory_region_init_io(&s->clock, NULL, &clock_ops, NULL,
-                          "nrf51_soc.clock", 0x1000);
+    memory_region_init_io(&s->clock, OBJECT(dev_soc), &clock_ops, NULL,
+                          "nrf51_soc.clock", NRF51_PERIPHERAL_SIZE);
     memory_region_add_subregion_overlap(&s->container,
                                         NRF51_IOMEM_BASE, &s->clock, -1);
 
@@ -184,28 +169,23 @@ static void nrf51_soc_init(Object *obj)
 
     memory_region_init(&s->container, obj, "nrf51-container", UINT64_MAX);
 
-    sysbus_init_child_obj(OBJECT(s), "armv6m", OBJECT(&s->cpu), sizeof(s->cpu),
-                          TYPE_ARMV7M);
+    object_initialize_child(OBJECT(s), "armv6m", &s->cpu, TYPE_ARMV7M);
     qdev_prop_set_string(DEVICE(&s->cpu), "cpu-type",
                          ARM_CPU_TYPE_NAME("cortex-m0"));
     qdev_prop_set_uint32(DEVICE(&s->cpu), "num-irq", 32);
 
-    sysbus_init_child_obj(obj, "uart", &s->uart, sizeof(s->uart),
-                           TYPE_NRF51_UART);
-    object_property_add_alias(obj, "serial0", OBJECT(&s->uart), "chardev",
-                              &error_abort);
+    object_initialize_child(obj, "uart", &s->uart, TYPE_NRF51_UART);
+    object_property_add_alias(obj, "serial0", OBJECT(&s->uart), "chardev");
 
-    sysbus_init_child_obj(obj, "rng", &s->rng, sizeof(s->rng),
-                           TYPE_NRF51_RNG);
+    object_initialize_child(obj, "rng", &s->rng, TYPE_NRF51_RNG);
 
-    sysbus_init_child_obj(obj, "nvm", &s->nvm, sizeof(s->nvm), TYPE_NRF51_NVM);
+    object_initialize_child(obj, "nvm", &s->nvm, TYPE_NRF51_NVM);
 
-    sysbus_init_child_obj(obj, "gpio", &s->gpio, sizeof(s->gpio),
-                          TYPE_NRF51_GPIO);
+    object_initialize_child(obj, "gpio", &s->gpio, TYPE_NRF51_GPIO);
 
     for (i = 0; i < NRF51_NUM_TIMERS; i++) {
-        sysbus_init_child_obj(obj, "timer[*]", &s->timer[i],
-                              sizeof(s->timer[i]), TYPE_NRF51_TIMER);
+        object_initialize_child(obj, "timer[*]", &s->timer[i],
+                                TYPE_NRF51_TIMER);
 
     }
 }
@@ -224,7 +204,7 @@ static void nrf51_soc_class_init(ObjectClass *klass, void *data)
     DeviceClass *dc = DEVICE_CLASS(klass);
 
     dc->realize = nrf51_soc_realize;
-    dc->props = nrf51_soc_properties;
+    device_class_set_props(dc, nrf51_soc_properties);
 }
 
 static const TypeInfo nrf51_soc_info = {

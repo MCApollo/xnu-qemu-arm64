@@ -11,9 +11,13 @@
 #include "cpu.h"
 #include "hw/boards.h"
 #include "qapi/error.h"
+#include "qapi/qapi-builtin-visit.h"
 #include "qapi/qapi-commands-machine.h"
 #include "qapi/qmp/qerror.h"
+#include "qapi/qmp/qobject.h"
+#include "qapi/qobject-input-visitor.h"
 #include "qemu/main-loop.h"
+#include "qom/qom-qobject.h"
 #include "sysemu/hostmem.h"
 #include "sysemu/hw_accel.h"
 #include "sysemu/numa.h"
@@ -230,6 +234,18 @@ MachineInfoList *qmp_query_machines(Error **errp)
         info->hotpluggable_cpus = mc->has_hotpluggable_cpus;
         info->numa_mem_supported = mc->numa_mem_supported;
         info->deprecated = !!mc->deprecation_reason;
+
+        if (strcmp(mc->name, MACHINE_GET_CLASS(current_machine)->name) == 0) {
+            info->has_is_current = true;
+            info->is_current = true;
+
+            // PVE version string only exists for current machine
+            if (mc->pve_version) {
+                info->has_pve_version = true;
+                info->pve_version = g_strdup(mc->pve_version);
+            }
+        }
+
         if (mc->default_cpu_type) {
             info->default_cpu_type = g_strdup(mc->default_cpu_type);
             info->has_default_cpu_type = true;
@@ -303,13 +319,15 @@ static int query_memdev(Object *obj, void *opaque)
 {
     MemdevList **list = opaque;
     MemdevList *m = NULL;
+    QObject *host_nodes;
+    Visitor *v;
 
     if (object_dynamic_cast(obj, TYPE_MEMORY_BACKEND)) {
         m = g_malloc0(sizeof(*m));
 
         m->value = g_malloc0(sizeof(*m->value));
 
-        m->value->id = object_get_canonical_path_component(obj);
+        m->value->id = g_strdup(object_get_canonical_path_component(obj));
         m->value->has_id = !!m->value->id;
 
         m->value->size = object_property_get_uint(obj, "size",
@@ -325,9 +343,13 @@ static int query_memdev(Object *obj, void *opaque)
                                                     "policy",
                                                     "HostMemPolicy",
                                                     &error_abort);
-        object_property_get_uint16List(obj, "host-nodes",
-                                       &m->value->host_nodes,
-                                       &error_abort);
+        host_nodes = object_property_get_qobject(obj,
+                                                 "host-nodes",
+                                                 &error_abort);
+        v = qobject_input_visitor_new(host_nodes);
+        visit_type_uint16List(v, NULL, &m->value->host_nodes, &error_abort);
+        visit_free(v);
+        qobject_unref(host_nodes);
 
         m->next = *list;
         *list = m;
