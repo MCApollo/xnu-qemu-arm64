@@ -37,6 +37,49 @@
 #include "cpu.h"
 #include "hw/arm/xnu_mem.h"
 
+
+#if 0
+/* Go-ahead and botch-fix the old API if you want, don't know why you're reading this. */
+#pragma message "FIXME: Using removed function memory_region_allocate_system_memory."
+
+const char *mem_path = NULL;
+static void allocate_system_memory_nonnuma(MemoryRegion *mr, Object *owner,
+                                           const char *name,
+                                           uint64_t ram_size)
+{
+    if (mem_path) {
+#ifdef __linux__
+        memory_region_init_ram_from_file(mr, owner, name, ram_size, 0, 0,
+                                         mem_path, &error_fatal);
+#else
+        fprintf(stderr, "-mem-path not supported on this host\n");
+        exit(1);
+#endif
+    } else {
+        memory_region_init_ram_nomigrate(mr, owner, name, ram_size, &error_fatal);
+    }
+    vmstate_register_ram_global(mr);
+}
+
+void memory_region_allocate_system_memory(MemoryRegion *mr, Object *owner,
+                                          const char *name,
+                                          uint64_t ram_size)
+{
+    MachineState *ms = MACHINE(qdev_get_machine());
+
+    if (ms->numa_state == NULL ||
+        ms->numa_state->num_nodes == 0 || numa_uses_legacy_mem()) {
+        allocate_system_memory_nonnuma(mr, owner, name, ram_size);
+        return;
+    }
+
+    memory_region_init(mr, owner, name, ram_size);
+    numa_init_memdev_container(ms, mr);
+}
+
+/* define mstate_register_ram_global(...) */
+#endif
+
 hwaddr g_virt_base = 0;
 hwaddr g_phys_base = 0;
 
@@ -117,6 +160,6 @@ void allocate_ram(MemoryRegion *top, const char *name, hwaddr addr,
                   hwaddr size)
 {
         MemoryRegion *sec = g_new(MemoryRegion, 1);
-        memory_region_allocate_system_memory(sec, NULL, name, size);
+        memory_region_init_ram(sec, NULL, name, size, &error_fatal);
         memory_region_add_subregion(top, addr, sec);
 }
